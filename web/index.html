@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TokenCraft | Tokenizer Visualizer & Comparison Studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>TokenCraft</h1>
+          <p class="subtitle">BPE vs WordPiece vs Character-Level Tokenizer Visualizer</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge">Zero Dependencies</span>
+        <span class="badge">Byte-Level Lossless</span>
+        <span class="badge badge-accent">v1.0.0</span>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Input Section -->
+      <section class="card input-card">
+        <div class="card-header">
+          <h2>Input Sentence Playground</h2>
+          <span class="hint">Type any sentence or pick a test preset below</span>
+        </div>
+
+        <div class="sample-pills" id="samplePills">
+          <!-- Dynamically populated or static presets -->
+          <button class="sample-btn" data-key="English General">English General</button>
+          <button class="sample-btn" data-key="Python Code">Python Code</button>
+          <button class="sample-btn" data-key="Contractions & Slang">Contractions</button>
+          <button class="sample-btn" data-key="Multilingual & Glyphs">Multilingual</button>
+          <button class="sample-btn" data-key="Compounds & Edge Cases">Long Compounds</button>
+        </div>
+
+        <div class="input-wrapper">
+          <textarea id="sentenceInput" rows="3" placeholder="Enter text to tokenize and compare across algorithms...">The quick brown fox jumps over the lazy dog and explores the wonders of tokenization.</textarea>
+        </div>
+
+        <div class="controls-bar">
+          <div class="slider-control">
+            <label for="vocabSize">Vocab Size: <span id="vocabSizeVal" class="slider-val">400</span></label>
+            <input type="range" id="vocabSize" min="100" max="1000" step="50" value="400">
+          </div>
+          <button id="compareBtn" class="btn btn-primary">
+            <span>Compare Tokenizers</span>
+            <span class="btn-icon">➔</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Comparative Metrics Overview -->
+      <section class="card metrics-card">
+        <div class="card-header">
+          <h2>Comparative Analysis Metrics</h2>
+          <span class="hint">Side-by-side performance indicators</span>
+        </div>
+        <div class="table-responsive">
+          <table class="metrics-table" id="metricsTable">
+            <thead>
+              <tr>
+                <th>Tokenizer</th>
+                <th>Vocab Size</th>
+                <th>Token Count</th>
+                <th>Compression (Bytes/Token)</th>
+                <th>Fertility (Tokens/Word)</th>
+                <th>OOV Rate</th>
+              </tr>
+            </thead>
+            <tbody id="metricsTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tokenizer Visualizations Grid -->
+      <section class="tokenizers-grid" id="tokenizersGrid">
+        <!-- BPE Container -->
+        <div class="card tok-card" id="card-bpe">
+          <div class="tok-header">
+            <div class="tok-title">
+              <span class="algo-tag tag-bpe">BPE</span>
+              <h3>Byte-Pair Encoding (GPT-style)</h3>
+            </div>
+            <div class="tok-stats" id="stats-bpe"></div>
+          </div>
+          <p class="tok-desc">Frequency-based iterative byte merges. Guaranteed zero OOV with byte-level fallback.</p>
+          <div class="token-container" id="tokens-bpe"></div>
+        </div>
+
+        <!-- WordPiece Container -->
+        <div class="card tok-card" id="card-wordpiece">
+          <div class="tok-header">
+            <div class="tok-title">
+              <span class="algo-tag tag-wp">WordPiece</span>
+              <h3>WordPiece (BERT-style)</h3>
+            </div>
+            <div class="tok-stats" id="stats-wordpiece"></div>
+          </div>
+          <p class="tok-desc">Likelihood ratio scoring with <code>##</code> continuation prefixes and greedy longest matching.</p>
+          <div class="token-container" id="tokens-wordpiece"></div>
+        </div>
+
+        <!-- Character-Level Container -->
+        <div class="card tok-card" id="card-char">
+          <div class="tok-header">
+            <div class="tok-title">
+              <span class="algo-tag tag-char">Char</span>
+              <h3>Character-Level</h3>
+            </div>
+            <div class="tok-stats" id="stats-char"></div>
+          </div>
+          <p class="tok-desc">Every character is an individual token. Minimal vocabulary, but maximum fertility.</p>
+          <div class="token-container" id="tokens-char"></div>
+        </div>
+
+        <!-- Byte-Level Container -->
+        <div class="card tok-card" id="card-byte">
+          <div class="tok-header">
+            <div class="tok-title">
+              <span class="algo-tag tag-byte">Byte</span>
+              <h3>Byte-Level (Raw 256)</h3>
+            </div>
+            <div class="tok-stats" id="stats-byte"></div>
+          </div>
+          <p class="tok-desc">Direct UTF-8 byte stream. 100% vocabulary completeness across any binary or unicode sequence.</p>
+          <div class="token-container" id="tokens-byte"></div>
+        </div>
+
+        <!-- Word-Level Container -->
+        <div class="card tok-card" id="card-word">
+          <div class="tok-header">
+            <div class="tok-title">
+              <span class="algo-tag tag-word">Word</span>
+              <h3>Word-Level</h3>
+            </div>
+            <div class="tok-stats" id="stats-word"></div>
+          </div>
+          <p class="tok-desc">Whitespace/punctuation word tokens. Low fertility, but susceptible to [UNK] on unseen terms.</p>
+          <div class="token-container" id="tokens-word"></div>
+        </div>
+      </section>
+
+      <!-- Deep Dive Educational Explainer -->
+      <section class="card explainer-card">
+        <div class="card-header">
+          <h2>Algorithm Comparison Deep Dive</h2>
+          <span class="hint">How each tokenizer approaches the problem</span>
+        </div>
+        <div class="explainer-grid">
+          <div class="explainer-item">
+            <h4>1. Byte-Pair Encoding (BPE)</h4>
+            <p><strong>Training:</strong> Starts with 256 byte tokens. Counts adjacent pair frequencies across pre-tokenized chunks, greedily merging the most frequent pair in each step.</p>
+            <p><strong>Used in:</strong> GPT-2, GPT-3, GPT-4, LLaMA, RoBERTa.</p>
+            <p><strong>Advantage:</strong> Eliminates out-of-vocabulary tokens while compressing repetitive sequences efficiently.</p>
+          </div>
+          <div class="explainer-item">
+            <h4>2. WordPiece</h4>
+            <p><strong>Training:</strong> Instead of raw frequency, evaluates candidate pair merges by Likelihood Ratio: <code>Score = count(u, v) / (count(u) * count(v))</code>.</p>
+            <p><strong>Used in:</strong> BERT, DistilBERT, Electra.</p>
+            <p><strong>Advantage:</strong> Prioritizes subwords that carry high mutual information rather than purely common characters.</p>
+          </div>
+          <div class="explainer-item">
+            <h4>3. Character & Baseline Models</h4>
+            <p><strong>Character-Level:</strong> Vocabulary size remains tiny (100–300), but token sequences become 4-6x longer, increasing transformer attention computation quadratic cost.</p>
+            <p><strong>Word-Level:</strong> Sequences are short, but vocabulary explodes into tens of thousands of words, unable to handle typos or morphological suffixes.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>TokenCraft &bull; Built with Python &bull; <a href="https://github.com/sujanv/TokenCraft" target="_blank">GitHub Repository</a></p>
+    </footer>
+  </div>
+
+  <div id="tooltip" class="tooltip"></div>
+  <script src="app.js"></script>
+</body>
+</html>
