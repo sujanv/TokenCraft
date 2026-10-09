@@ -287,6 +287,16 @@ class BPETokenizer(BaseTokenizer):
                             byte_stream.extend(ch.encode("utf-8"))
         return byte_stream.decode("utf-8", errors="replace")
 
+    def get_provenance_tracker(self) -> "BPEProvenanceTracker":
+        """Returns a provenance tracker for inspecting merge derivation trees."""
+        from tokencraft.provenance import BPEProvenanceTracker
+        return BPEProvenanceTracker(self.merges)
+
+    def trace_token(self, token: str) -> str:
+        """Returns ASCII derivation tree showing how the subword was assembled."""
+        tracker = self.get_provenance_tracker()
+        return tracker.trace_token(token)
+
     def to_dict(self) -> Dict[str, Any]:
         data = super().to_dict()
         data.update({
