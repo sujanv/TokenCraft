@@ -31,6 +31,10 @@ const elements = {
       container: document.getElementById("tokens-wordpiece"),
       stats: document.getElementById("stats-wordpiece"),
     },
+    unigram: {
+      container: document.getElementById("tokens-unigram"),
+      stats: document.getElementById("stats-unigram"),
+    },
     char: {
       container: document.getElementById("tokens-char"),
       stats: document.getElementById("stats-char"),
@@ -116,6 +120,8 @@ function renderResults(data) {
     "BPE (GPT-style)": "bpe",
     "WordPiece (BERT)": "wordpiece",
     "WordPiece (BERT-style)": "wordpiece",
+    "Unigram (SentencePiece)": "unigram",
+    "Unigram (SentencePiece-style)": "unigram",
     "Character-Level": "char",
     "Byte-Level (256)": "byte",
     "Word-Level": "word",

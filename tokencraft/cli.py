@@ -1,7 +1,7 @@
 """
 Command-Line Interface and Terminal Visualizer for TokenCraft.
 Provides ANSI colored token visualization, training, side-by-side comparison,
-and interactive server commands.
+provenance tracing, model exporting, and interactive server commands.
 """
 
 from __future__ import annotations
@@ -13,9 +13,13 @@ from typing import List
 
 from tokencraft.bpe import BPETokenizer
 from tokencraft.wordpiece import WordPieceTokenizer
+from tokencraft.unigram import UnigramTokenizer
 from tokencraft.char import CharacterTokenizer
 from tokencraft.baselines import ByteTokenizer, WordTokenizer
 from tokencraft.comparator import TokenizerComparator
+from tokencraft.provenance import BPEProvenanceTracker
+from tokencraft.exporter import HuggingFaceExporter, OpenAIGPT2Exporter
+from tokencraft.analytics import VocabularyAnalytics
 
 
 # ANSI color codes for alternating token pill visualization in terminal
@@ -68,11 +72,11 @@ def cmd_compare(args):
     print(f"{BOLD}======================================================================{RESET}")
     print(f"{DIM}Input:{RESET} {BOLD}\"{sentence}\"{RESET}\n")
 
-    # Load or train default tokenizers
     corpus = [
         "Tokenization is the foundation of modern Large Language Models and natural language processing.",
         "Byte Pair Encoding merges frequent pairs of bytes or characters iteratively into subwords.",
         "WordPiece uses a likelihood score to maximize training data probability with continuation markers.",
+        "Unigram language modeling prunes candidate substrings using Viterbi dynamic programming segmentation.",
         "Character tokenization splits strings into individual letters and glyphs with small vocabulary.",
         "Deep learning architectures like GPT, BERT, LLaMA, and Claude rely on fast tokenization.",
         sentence,
@@ -84,6 +88,9 @@ def cmd_compare(args):
     wp = WordPieceTokenizer(name="WordPiece (BERT-style)")
     wp.train(corpus, vocab_size=320)
 
+    uni = UnigramTokenizer(name="Unigram (SentencePiece)")
+    uni.train(corpus, vocab_size=320)
+
     char_tok = CharacterTokenizer(name="Character-Level")
     char_tok.train(corpus, vocab_size=150)
 
@@ -91,7 +98,7 @@ def cmd_compare(args):
     word_tok = WordTokenizer(name="Word-Level")
     word_tok.train(corpus, vocab_size=200)
 
-    comparator = TokenizerComparator([bpe, wp, char_tok, byte_tok, word_tok])
+    comparator = TokenizerComparator([bpe, wp, uni, char_tok, byte_tok, word_tok])
     res = comparator.compare_sentence(sentence)
 
     # Print Visual Split Breakdown
@@ -140,6 +147,9 @@ def cmd_train(args):
     elif tok_type == "wordpiece":
         tokenizer = WordPieceTokenizer(name=f"WordPiece-{args.vocab_size}")
         tokenizer.train(corpus, vocab_size=args.vocab_size, show_progress=True)
+    elif tok_type == "unigram":
+        tokenizer = UnigramTokenizer(name=f"Unigram-{args.vocab_size}")
+        tokenizer.train(corpus, vocab_size=args.vocab_size, show_progress=True)
     elif tok_type in ("char", "character"):
         tokenizer = CharacterTokenizer(name=f"Char-{args.vocab_size}")
         tokenizer.train(corpus, vocab_size=args.vocab_size)
@@ -168,6 +178,8 @@ def cmd_encode(args):
         tokenizer = BPETokenizer.from_dict(data)
     elif tok_type == "WordPieceTokenizer":
         tokenizer = WordPieceTokenizer.from_dict(data)
+    elif tok_type == "UnigramTokenizer":
+        tokenizer = UnigramTokenizer.from_dict(data)
     elif tok_type == "CharacterTokenizer":
         tokenizer = CharacterTokenizer.from_dict(data)
     elif tok_type == "WordTokenizer":
@@ -193,6 +205,8 @@ def cmd_decode(args):
         tokenizer = BPETokenizer.from_dict(data)
     elif tok_type == "WordPieceTokenizer":
         tokenizer = WordPieceTokenizer.from_dict(data)
+    elif tok_type == "UnigramTokenizer":
+        tokenizer = UnigramTokenizer.from_dict(data)
     elif tok_type == "CharacterTokenizer":
         tokenizer = CharacterTokenizer.from_dict(data)
     else:
@@ -201,6 +215,79 @@ def cmd_decode(args):
     ids = [int(x.strip()) for x in args.ids.split(",") if x.strip()]
     decoded_text = tokenizer.decode(ids)
     print(f"{BOLD}Decoded Text:{RESET} {decoded_text}")
+
+
+def cmd_trace(args):
+    """Trace the merge derivation tree of a BPE token."""
+    model_path = args.model
+    if not os.path.exists(model_path):
+        print(f"Error: Model not found at {model_path}", file=sys.stderr)
+        sys.exit(1)
+
+    with open(model_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    bpe = BPETokenizer.from_dict(data)
+    tracker = BPEProvenanceTracker(bpe.merges)
+    tree_str = tracker.trace_token(args.token)
+    print(f"\n{BOLD}======================================================================{RESET}")
+    print(f"{BOLD} TokenCraft Merge Derivation Tree{RESET}")
+    print(f"{BOLD}======================================================================{RESET}")
+    print(tree_str)
+
+
+def cmd_export(args):
+    """Export BPE tokenizer to HuggingFace or OpenAI formats."""
+    with open(args.model, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    bpe = BPETokenizer.from_dict(data)
+
+    fmt = args.format.lower()
+    if fmt in ("hf", "huggingface"):
+        HuggingFaceExporter.export_tokenizer_json(bpe, args.output)
+        print(f"Exported Hugging Face tokenizer to: {args.output}")
+    elif fmt in ("gpt2", "openai"):
+        OpenAIGPT2Exporter.export(bpe, args.output)
+        print(f"Exported GPT-2 vocab.json and merges.txt to directory: {args.output}")
+    else:
+        print(f"Unknown format: {args.format}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_analyze_vocab(args):
+    """Analyze tokenizer vocabulary statistics and length distributions."""
+    with open(args.model, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    tok_type = data.get("type", "BPETokenizer")
+    if tok_type == "BPETokenizer":
+        tok = BPETokenizer.from_dict(data)
+    elif tok_type == "WordPieceTokenizer":
+        tok = WordPieceTokenizer.from_dict(data)
+    elif tok_type == "UnigramTokenizer":
+        tok = UnigramTokenizer.from_dict(data)
+    else:
+        tok = BPETokenizer.from_dict(data)
+
+    stats = VocabularyAnalytics.analyze(tok)
+    print(f"\n{BOLD}======================================================================{RESET}")
+    print(f"{BOLD} Vocabulary Analysis: {stats['name']}{RESET}")
+    print(f"{BOLD}======================================================================{RESET}")
+    print(f"Vocab Size:         {stats['vocab_size']}")
+    print(f"Avg Token Length:   {stats['avg_token_length']} chars")
+    print(f"Longest Token:      \"{stats['longest_token']}\" ({stats['max_token_length']} chars)")
+    print(f"Single Characters:  {stats['single_char_tokens']} ({stats['single_char_ratio']}%)")
+    print(f"Multi-Char Subwords:{stats['multi_char_tokens']} ({stats['multi_char_ratio']}%)")
+    print(f"ASCII vs Unicode:   {stats['ascii_tokens']} ASCII / {stats['unicode_tokens']} Unicode")
+
+    print(f"\n{BOLD}Length Distribution:{RESET}")
+    headers = ["Bucket", "Token Count", "Ratio"]
+    rows = []
+    total = max(1, stats["vocab_size"])
+    for k, v in sorted(stats["length_distribution"].items(), key=lambda x: str(x[0])):
+        rows.append([f"{k} chars", str(v), f"{(v/total)*100:.1f}%"])
+    print_table(headers, rows)
+    print()
 
 
 def cmd_serve(args):
@@ -222,11 +309,13 @@ def cmd_benchmark(args):
     bpe.train(sentences, vocab_size=300)
     wp = WordPieceTokenizer(name="WordPiece")
     wp.train(sentences, vocab_size=300)
+    uni = UnigramTokenizer(name="Unigram")
+    uni.train(sentences, vocab_size=300)
     ch = CharacterTokenizer(name="Char")
     ch.train(sentences, vocab_size=150)
     by = ByteTokenizer(name="Byte")
 
-    comparator = TokenizerComparator([bpe, wp, ch, by])
+    comparator = TokenizerComparator([bpe, wp, uni, ch, by])
     print(f"\n{BOLD}Running Speed & Throughput Benchmark...{RESET}")
     bench = comparator.benchmark_speed(sentences, iterations=50)
 
@@ -259,7 +348,7 @@ def main():
 
     # train
     p_train = subparsers.add_parser("train", help="Train a tokenizer on a corpus file")
-    p_train.add_argument("--type", choices=["bpe", "wordpiece", "char", "word"], default="bpe", help="Tokenizer algorithm")
+    p_train.add_argument("--type", choices=["bpe", "wordpiece", "unigram", "char", "word"], default="bpe", help="Tokenizer algorithm")
     p_train.add_argument("--corpus", required=True, help="Path to text corpus file")
     p_train.add_argument("--vocab-size", type=int, default=1000, help="Target vocabulary size")
     p_train.add_argument("--save", required=True, help="Output JSON model file path")
@@ -276,6 +365,24 @@ def main():
     p_dec.add_argument("--model", required=True, help="Path to saved tokenizer JSON model")
     p_dec.add_argument("ids", help="Comma-separated token IDs, e.g. '12,45,67'")
     p_dec.set_defaults(func=cmd_decode)
+
+    # trace
+    p_trace = subparsers.add_parser("trace", help="Trace the merge derivation tree of a BPE token")
+    p_trace.add_argument("token", help="Token to trace, e.g. 'tokenization'")
+    p_trace.add_argument("--model", default="models/bpe_general.json", help="Path to BPE model JSON")
+    p_trace.set_defaults(func=cmd_trace)
+
+    # export
+    p_exp = subparsers.add_parser("export", help="Export BPE tokenizer to HuggingFace or OpenAI formats")
+    p_exp.add_argument("--model", required=True, help="Path to BPE model JSON")
+    p_exp.add_argument("--format", choices=["hf", "gpt2"], default="hf", help="Target export format")
+    p_exp.add_argument("--output", required=True, help="Output path (file for HF, directory for GPT-2)")
+    p_exp.set_defaults(func=cmd_export)
+
+    # analyze-vocab
+    p_ana = subparsers.add_parser("analyze-vocab", help="Analyze vocabulary length distribution and statistics")
+    p_ana.add_argument("--model", required=True, help="Path to tokenizer JSON model")
+    p_ana.set_defaults(func=cmd_analyze_vocab)
 
     # benchmark
     p_bench = subparsers.add_parser("benchmark", help="Benchmark speed and throughput across tokenizers")
