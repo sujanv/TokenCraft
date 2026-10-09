@@ -12,6 +12,7 @@ sys.path.insert(0, ROOT_DIR)
 
 from tokencraft.bpe import BPETokenizer
 from tokencraft.wordpiece import WordPieceTokenizer
+from tokencraft.unigram import UnigramTokenizer
 from tokencraft.char import CharacterTokenizer
 from tokencraft.baselines import ByteTokenizer, WordTokenizer
 
@@ -36,6 +37,12 @@ def main():
     wp.train(corpus, vocab_size=400, show_progress=False)
     wp.save(os.path.join(models_dir, "wordpiece_general.json"))
     print(f"Saved WordPiece model (vocab: {wp.vocab_size})")
+
+    print("Training Unigram model...")
+    uni = UnigramTokenizer(name="Unigram-General")
+    uni.train(corpus, vocab_size=350, show_progress=False)
+    uni.save(os.path.join(models_dir, "unigram_general.json"))
+    print(f"Saved Unigram model (vocab: {uni.vocab_size})")
 
     print("Training Character model...")
     char_tok = CharacterTokenizer(name="Char-General")
