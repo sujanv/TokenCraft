@@ -1,0 +1,15 @@
+Tokenization is the foundational process in Natural Language Processing and modern Large Language Models.
+It converts unstructured raw text strings into discrete integer sequences suitable for neural network embeddings.
+Traditional rule-based systems relied on whitespace splitting, but suffered from massive vocabularies and out-of-vocabulary failures.
+Subword tokenization bridges the gap between whole-word vocabularies and character-level models.
+Byte-Pair Encoding, originally developed as a data compression algorithm by Philip Gage in 1994, was adapted for NLP by Rico Sennrich in 2015.
+BPE iteratively replaces the most frequent pairs of adjacent bytes or characters in a corpus with a single, unused symbol.
+OpenAI adopted byte-level BPE for GPT-2, GPT-3, GPT-4, and the Tiktoken library, ensuring 100% vocabulary coverage with zero unknown tokens.
+WordPiece, introduced by Schuster and Nakajima in 2012 and popularized by Google BERT, uses likelihood ratio scoring rather than raw frequencies.
+Continuation subwords in WordPiece are denoted using prefix markers such as double hashes.
+Character-level tokenization operates directly on Unicode codepoints, maintaining tiny vocabularies at the cost of high sequence lengths.
+Fertility measures the average number of subword tokens produced per word in natural language text.
+Compression ratio measures the average number of raw UTF-8 bytes represented per token.
+Properly handling punctuation, contractions, casing, numbers, and special symbols is critical for tokenizer performance.
+High-quality tokenizers preserve semantic boundaries and enable efficient transformer attention across large context windows.
+TokenCraft provides an educational, production-ready environment to study and visualize these algorithms side-by-side.

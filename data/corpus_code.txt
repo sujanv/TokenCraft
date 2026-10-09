@@ -1,0 +1,26 @@
+def tokenize_text(text: str, vocab: dict) -> list[int]:
+    tokens = []
+    for word in text.split():
+        if word in vocab:
+            tokens.append(vocab[word])
+        else:
+            tokens.append(vocab["[UNK]"])
+    return tokens
+
+class TransformerBlock:
+    def __init__(self, hidden_dim: int, num_heads: int):
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+
+    def forward(self, x, mask=None):
+        attn_weights = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        if mask is not None:
+            attn_weights = attn_weights.masked_fill(mask == 0, -1e9)
+        output = softmax(attn_weights, dim=-1) @ v
+        return output
+
+async def fetch_embeddings(token_ids: list[int]) -> list[float]:
+    async with aiohttp.ClientSession() as session:
+        async with session.post("/embed", json={"ids": token_ids}) as response:
+            return await response.json()

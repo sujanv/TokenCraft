@@ -1,0 +1,11 @@
+TokenCraft supports multilingual NLP datasets across diverse writing systems and Unicode scripts.
+English: Hello world! The quick brown fox jumps over the lazy dog.
+Spanish: ¡Hola Mundo! El veloz murciélago hindú comía feliz cardillo y kiwi.
+French: Bonjour le monde! Portez ce vieux whisky au juge blond qui fume.
+German: Guten Tag! Donaudampfschifffahrtselektrizitätenhauptbetriebswerkbauunterbeamtengesellschaft.
+Japanese: こんにちは世界！吾輩は猫である。名前はまだ無い。
+Chinese: 你好，世界！深度学习与大语言模型的分词算法研究。
+Russian: Привет, мир! В чащах юга жил-был цитрус, но фальшивый экземпляр.
+Arabic: مرحبًا بالعالم! الذكاء الاصطناعي ومعالجة اللغات الطبيعية.
+Hindi: नमस्ते दुनिया! प्राकृतिक भाषा प्रसंस्करण और टोकनाइज़र एल्गोरिदम।
+Emojis & Symbols: 🚀 🤖 💡 🧠 🔥 ✨ ∑(x_i) = ∫ f(x) dx ≠ ∞
