@@ -13,11 +13,12 @@ from tokencraft.base import (
 )
 from tokencraft.bpe import BPETokenizer
 from tokencraft.wordpiece import WordPieceTokenizer
+from tokencraft.unigram import UnigramTokenizer
 from tokencraft.char import CharacterTokenizer
 from tokencraft.baselines import ByteTokenizer, WordTokenizer
 from tokencraft.comparator import TokenizerComparator
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     "BaseTokenizer",
     "Token",
@@ -25,6 +26,7 @@ __all__ = [
     "TokenizerMetrics",
     "BPETokenizer",
     "WordPieceTokenizer",
+    "UnigramTokenizer",
     "CharacterTokenizer",
     "ByteTokenizer",
     "WordTokenizer",
