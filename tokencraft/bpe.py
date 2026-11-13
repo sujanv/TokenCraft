@@ -189,11 +189,19 @@ class BPETokenizer(BaseTokenizer):
 
         return word_list
 
-    def encode(self, text: str) -> TokenizationResult:
+    def encode(
+        self,
+        text: str,
+        dropout_rate: float = 0.0,
+        rng: Optional[Any] = None,
+    ) -> TokenizationResult:
         """
         Tokenize input text using byte-level BPE.
+        Supports BPE-Dropout for stochastic subword regularization when dropout_rate > 0.
         Preserves character span offsets.
         """
+        from tokencraft.dropout import bpe_encode_word_dropout
+
         normalized_text = self.normalizer.normalize(text)
         tokens: List[Token] = []
 
@@ -235,7 +243,12 @@ class BPETokenizer(BaseTokenizer):
             chunks = self.pre_tokenizer.pre_tokenize(subtext)
             for chunk_str, start_idx, end_idx in chunks:
                 b_chars = tuple(self.byte_encoder[b] for b in chunk_str.encode("utf-8"))
-                bpe_tokens = self._bpe_encode_word(b_chars)
+                if dropout_rate > 0.0:
+                    bpe_tokens = bpe_encode_word_dropout(
+                        b_chars, self.bpe_ranks, dropout_rate=dropout_rate, rng=rng
+                    )
+                else:
+                    bpe_tokens = self._bpe_encode_word(b_chars)
 
                 # Map subwords back to tokens
                 abs_start = subtext_offset + start_idx
@@ -267,6 +280,20 @@ class BPETokenizer(BaseTokenizer):
             current_pos = next_special_start
 
         return TokenizationResult(text=text, tokens=tokens)
+
+    def sample_segmentations(
+        self,
+        text: str,
+        n: int = 5,
+        dropout_rate: float = 0.2,
+        seed: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Samples `n` stochastic subword segmentations of `text` using BPE-Dropout.
+        """
+        from tokencraft.dropout import BPEDropoutSampler
+        sampler = BPEDropoutSampler(self)
+        return sampler.sample(text, n=n, dropout_rate=dropout_rate, seed=seed)
 
     def decode(self, token_ids: List[int]) -> str:
         """
