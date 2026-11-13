@@ -151,6 +151,29 @@ class BaseTokenizer(ABC):
         """Convenience method returning just the token strings."""
         return self.encode(text).token_strings
 
+    def encode_batch(
+        self,
+        texts: List[str],
+        padding: Union[bool, str] = "longest",
+        max_length: Optional[int] = None,
+        truncation: bool = True,
+        padding_side: str = "right",
+        return_attention_mask: bool = True,
+        **kwargs,
+    ) -> Any:
+        """Batch tokenization supporting uniform padding, truncation, and attention masks."""
+        from tokencraft.batch import BatchProcessor
+        return BatchProcessor.encode_batch(
+            self,
+            texts=texts,
+            padding=padding,
+            max_length=max_length,
+            truncation=truncation,
+            padding_side=padding_side,
+            return_attention_mask=return_attention_mask,
+            **kwargs,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize tokenizer configuration and vocabulary state."""
         return {
