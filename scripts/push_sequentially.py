@@ -81,9 +81,13 @@ def load_state() -> dict:
 
 
 def save_state(state: dict):
-    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
+    try:
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except Exception:
+        # Fall back to root or skip if restricted
+        pass
 
 
 def push_single_commit(commit_hash: str, branch: str = "main", remote: str = "origin", dry_run: bool = False):
