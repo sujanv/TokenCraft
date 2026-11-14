@@ -290,6 +290,105 @@ def cmd_analyze_vocab(args):
     print()
 
 
+def cmd_diff(args):
+    """Compare exact cut boundaries between two tokenizers."""
+    from tokencraft.diff import TokenizerDiffEngine
+
+    corpus = [
+        "Tokenization is the foundation of modern Large Language Models and natural language processing.",
+        "Byte Pair Encoding merges frequent pairs of bytes or characters iteratively into subwords.",
+        "WordPiece uses a likelihood score to maximize training data probability with continuation markers.",
+        "Unigram language modeling prunes candidate substrings using Viterbi dynamic programming segmentation.",
+        args.sentence,
+    ]
+
+    def build_tok(tok_name: str):
+        tok_name = tok_name.lower()
+        if tok_name == "bpe":
+            t = BPETokenizer(name="BPE")
+            t.train(corpus, vocab_size=args.vocab_size)
+            return t
+        elif tok_name in ("wordpiece", "wp"):
+            t = WordPieceTokenizer(name="WordPiece")
+            t.train(corpus, vocab_size=args.vocab_size)
+            return t
+        elif tok_name in ("unigram", "uni"):
+            t = UnigramTokenizer(name="Unigram")
+            t.train(corpus, vocab_size=args.vocab_size)
+            return t
+        elif tok_name in ("char", "character"):
+            t = CharacterTokenizer(name="Character")
+            t.train(corpus, vocab_size=150)
+            return t
+        else:
+            t = WordTokenizer(name="Word")
+            t.train(corpus, vocab_size=300)
+            return t
+
+    t1 = build_tok(args.tok1)
+    t2 = build_tok(args.tok2)
+    diff = TokenizerDiffEngine.compare(t1, t2, args.sentence)
+    print(diff.render_cli())
+
+
+def cmd_dropout(args):
+    """Sample multiple stochastic segmentations using BPE-Dropout."""
+    if not os.path.exists(args.model):
+        print(f"Error: Model not found at {args.model}", file=sys.stderr)
+        sys.exit(1)
+
+    with open(args.model, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    bpe = BPETokenizer.from_dict(data)
+
+    print(f"\n{BOLD}======================================================================{RESET}")
+    print(f"{BOLD} BPE-Dropout Stochastic Regularization (α = {args.dropout}){RESET}")
+    print(f"{BOLD}======================================================================{RESET}")
+    print(f"{DIM}Input:{RESET} \"{args.text}\"\n")
+
+    det = bpe.encode(args.text, dropout_rate=0.0)
+    print(f"{BOLD}Greedy Deterministic (α = 0.0):{RESET} {format_colored_tokens(det.token_strings)}")
+
+    samples = bpe.sample_segmentations(args.text, n=args.samples, dropout_rate=args.dropout, seed=args.seed)
+    print(f"\n{BOLD}Stochastic Samples:{RESET}")
+    for i, s in enumerate(samples, 1):
+        colored = format_colored_tokens(s["token_strings"])
+        print(f"  Sample #{i} ({s['token_count']} tokens): {colored}")
+    print()
+
+
+def cmd_batch(args):
+    """Batch tokenize sentences with uniform padding and attention masks."""
+    if not os.path.exists(args.model):
+        print(f"Error: Model not found at {args.model}", file=sys.stderr)
+        sys.exit(1)
+
+    with open(args.model, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    tok_type = data.get("type", "BPETokenizer")
+    if tok_type == "BPETokenizer":
+        tok = BPETokenizer.from_dict(data)
+    elif tok_type == "WordPieceTokenizer":
+        tok = WordPieceTokenizer.from_dict(data)
+    elif tok_type == "UnigramTokenizer":
+        tok = UnigramTokenizer.from_dict(data)
+    else:
+        tok = BPETokenizer.from_dict(data)
+
+    batch = tok.encode_batch(args.sentences, padding=args.padding, max_length=args.max_length)
+    print(f"\n{BOLD}======================================================================{RESET}")
+    print(f"{BOLD} Batch Encoding & Attention Mask Collation{RESET}")
+    print(f"{BOLD}======================================================================{RESET}")
+    print(f"Batch Size: {len(batch)} | Max Length: {batch.max_length} | Padding Side: {batch.padding_side}\n")
+
+    for i, (ids, mask, strings) in enumerate(zip(batch.input_ids, batch.attention_mask, batch.token_strings), 1):
+        print(f"{BOLD}Sentence #{i}:{RESET}")
+        print(f"  Tokens:         {format_colored_tokens(strings)}")
+        print(f"  Input IDs:      {ids}")
+        print(f"  Attention Mask: {mask}\n")
+
+
 def cmd_serve(args):
     """Launch the Web Visualizer server."""
     from tokencraft.server import run_server
@@ -387,6 +486,31 @@ def main():
     # benchmark
     p_bench = subparsers.add_parser("benchmark", help="Benchmark speed and throughput across tokenizers")
     p_bench.set_defaults(func=cmd_benchmark)
+
+    # diff
+    p_diff = subparsers.add_parser("diff", help="Compare token cut boundaries between two algorithms")
+    p_diff.add_argument("sentence", help="Text to compare")
+    p_diff.add_argument("--tok1", default="bpe", help="First tokenizer (bpe, wordpiece, unigram, char, word)")
+    p_diff.add_argument("--tok2", default="wordpiece", help="Second tokenizer")
+    p_diff.add_argument("--vocab-size", type=int, default=350, help="Vocab size")
+    p_diff.set_defaults(func=cmd_diff)
+
+    # dropout
+    p_drop = subparsers.add_parser("dropout", help="Sample stochastic subword segmentations with BPE-Dropout")
+    p_drop.add_argument("text", help="Text to tokenize")
+    p_drop.add_argument("--model", default="models/bpe_general.json", help="Path to BPE model JSON")
+    p_drop.add_argument("--dropout", type=float, default=0.25, help="Dropout probability (0.0 - 0.5)")
+    p_drop.add_argument("--samples", type=int, default=4, help="Number of samples to draw")
+    p_drop.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    p_drop.set_defaults(func=cmd_dropout)
+
+    # batch
+    p_batch = subparsers.add_parser("batch", help="Batch tokenize with padding and attention masks")
+    p_batch.add_argument("sentences", nargs="+", help="One or more sentences to batch encode")
+    p_batch.add_argument("--model", default="models/bpe_general.json", help="Path to model JSON")
+    p_batch.add_argument("--max-length", type=int, default=16, help="Target max length for collation")
+    p_batch.add_argument("--padding", default="longest", choices=["longest", "max_length"], help="Padding strategy")
+    p_batch.set_defaults(func=cmd_batch)
 
     # serve
     p_serve = subparsers.add_parser("serve", help="Launch interactive Web Visualizer dashboard")
