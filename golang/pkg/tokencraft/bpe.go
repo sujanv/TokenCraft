@@ -2,7 +2,6 @@ package tokencraft
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
