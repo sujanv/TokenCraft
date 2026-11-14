@@ -165,6 +165,73 @@
         </div>
       </section>
 
+      <!-- Advanced Features Studio Tabs -->
+      <section class="card advanced-card">
+        <div class="card-header">
+          <h2>Advanced Tokenization Tools & Analysis</h2>
+          <span class="hint">BPE-Dropout Regularization, Cross-Tokenizer Diff, and Batch Attention Masks</span>
+        </div>
+
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-tab="tab-dropout">BPE-Dropout Regularization</button>
+          <button class="tab-btn" data-tab="tab-diff">Cross-Tokenizer Diff</button>
+          <button class="tab-btn" data-tab="tab-batch">Batch & Attention Masks</button>
+        </div>
+
+        <!-- Tab 1: BPE Dropout -->
+        <div class="tab-content active" id="tab-dropout">
+          <p class="tok-desc">Stochastic subword regularization (Provilkov et al.). Randomly skips candidate merges during inference/training to expose models to morphological variations.</p>
+          <div class="dropout-controls">
+            <div class="slider-control">
+              <label for="dropoutRate">Dropout Rate (α): <span id="dropoutRateVal" class="slider-val">0.25</span></label>
+              <input type="range" id="dropoutRate" min="0.0" max="0.5" step="0.05" value="0.25">
+            </div>
+            <button id="sampleDropoutBtn" class="btn btn-primary">Generate Stochastic Samples</button>
+          </div>
+          <div id="dropoutResults" class="dropout-results-grid"></div>
+        </div>
+
+        <!-- Tab 2: Cross-Tokenizer Diff -->
+        <div class="tab-content" id="tab-diff">
+          <p class="tok-desc">Compare exact cut boundaries and calculate Jaccard overlap between two tokenizers on the current sentence.</p>
+          <div class="diff-controls">
+            <div class="select-group">
+              <label>Tokenizer 1:
+                <select id="diffTok1">
+                  <option value="bpe">BPE (Byte-Pair)</option>
+                  <option value="wordpiece">WordPiece (BERT)</option>
+                  <option value="unigram">Unigram (SentencePiece)</option>
+                </select>
+              </label>
+              <label>Tokenizer 2:
+                <select id="diffTok2">
+                  <option value="wordpiece" selected>WordPiece (BERT)</option>
+                  <option value="bpe">BPE (Byte-Pair)</option>
+                  <option value="unigram">Unigram (SentencePiece)</option>
+                </select>
+              </label>
+            </div>
+            <button id="runDiffBtn" class="btn btn-primary">Compare Tokenizer Cuts</button>
+          </div>
+          <div id="diffResults" class="diff-container"></div>
+        </div>
+
+        <!-- Tab 3: Batch Attention Masks -->
+        <div class="tab-content" id="tab-batch">
+          <p class="tok-desc">Simulate LLM batch collation: paddings, truncations, and binary attention masks.</p>
+          <div class="batch-inputs">
+            <textarea id="batchInput" rows="3" placeholder="Enter one sentence per line...">The quick brown fox jumps.
+TokenCraft implements fast subwords.
+Short string.</textarea>
+            <div class="batch-controls">
+              <label>Max Length: <input type="number" id="batchMaxLen" value="12" min="4" max="64"></label>
+              <button id="runBatchBtn" class="btn btn-primary">Process Batch</button>
+            </div>
+          </div>
+          <div id="batchResults" class="batch-results-view"></div>
+        </div>
+      </section>
+
       <!-- Deep Dive Educational Explainer -->
       <section class="card explainer-card">
         <div class="card-header">

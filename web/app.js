@@ -280,6 +280,195 @@ function runClientSideFallback(sentence, vocabSize) {
   renderResults(mockData);
 }
 
+// Advanced Tabs switching
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    const target = document.getElementById(btn.dataset.tab);
+    if (target) target.classList.add("active");
+  });
+});
+
+// Dropout Slider & Action
+const dropoutRateInput = document.getElementById("dropoutRate");
+const dropoutRateVal = document.getElementById("dropoutRateVal");
+if (dropoutRateInput && dropoutRateVal) {
+  dropoutRateInput.addEventListener("input", (e) => {
+    dropoutRateVal.textContent = e.target.value;
+  });
+}
+
+const sampleDropoutBtn = document.getElementById("sampleDropoutBtn");
+if (sampleDropoutBtn) {
+  sampleDropoutBtn.addEventListener("click", async () => {
+    const sentence = elements.sentenceInput.value.trim();
+    const rate = parseFloat(dropoutRateInput.value);
+    const container = document.getElementById("dropoutResults");
+    container.innerHTML = "<div>Sampling stochastic subwords...</div>";
+
+    try {
+      const resp = await fetch("/api/dropout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sentence, dropout_rate: rate, samples: 4 })
+      });
+      const data = await resp.json();
+      container.innerHTML = "";
+
+      // Deterministic baseline
+      const detRow = document.createElement("div");
+      detRow.className = "dropout-sample-row";
+      detRow.innerHTML = `<span class="dropout-sample-title">Greedy Deterministic (α = 0.0) &bull; ${data.deterministic.token_count} tokens</span>`;
+      const detChips = document.createElement("div");
+      detChips.className = "token-container";
+      data.deterministic.tokens.forEach((t, idx) => {
+        const chip = document.createElement("div");
+        chip.className = `token-chip ${COLOR_CLASSES[idx % COLOR_CLASSES.length]}`;
+        chip.innerHTML = `<span>${escapeHtml(t.text)}</span>`;
+        detChips.appendChild(chip);
+      });
+      detRow.appendChild(detChips);
+      container.appendChild(detRow);
+
+      // Stochastic samples
+      data.samples.forEach((sample, i) => {
+        const row = document.createElement("div");
+        row.className = "dropout-sample-row";
+        row.innerHTML = `<span class="dropout-sample-title">Stochastic Sample #${i + 1} (α = ${rate}) &bull; ${sample.token_count} tokens</span>`;
+        const chips = document.createElement("div");
+        chips.className = "token-container";
+        sample.token_strings.forEach((str, idx) => {
+          const chip = document.createElement("div");
+          chip.className = `token-chip ${COLOR_CLASSES[(idx + i) % COLOR_CLASSES.length]}`;
+          chip.innerHTML = `<span>${escapeHtml(str)}</span>`;
+          chips.appendChild(chip);
+        });
+        row.appendChild(chips);
+        container.appendChild(row);
+      });
+    } catch (e) {
+      container.innerHTML = `<div style="color:var(--accent-rose)">Dropout request failed: ${e.message}</div>`;
+    }
+  });
+}
+
+// Diff Action
+const runDiffBtn = document.getElementById("runDiffBtn");
+if (runDiffBtn) {
+  runDiffBtn.addEventListener("click", async () => {
+    const sentence = elements.sentenceInput.value.trim();
+    const tok1 = document.getElementById("diffTok1").value;
+    const tok2 = document.getElementById("diffTok2").value;
+    const container = document.getElementById("diffResults");
+    container.innerHTML = "<div>Computing boundary alignment diff...</div>";
+
+    try {
+      const resp = await fetch("/api/diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sentence, tok1, tok2 })
+      });
+      const data = await resp.json();
+      container.innerHTML = `
+        <div class="diff-stat-boxes">
+          <div class="diff-box">
+            <div class="diff-box-val">${(data.boundary_overlap_score * 100).toFixed(1)}%</div>
+            <div class="diff-box-lbl">Boundary Jaccard Overlap</div>
+          </div>
+          <div class="diff-box">
+            <div class="diff-box-val">${data.shared_boundaries.length}</div>
+            <div class="diff-box-lbl">Shared Cut Points</div>
+          </div>
+          <div class="diff-box">
+            <div class="diff-box-val">${data.exclusive_boundaries1.length}</div>
+            <div class="diff-box-lbl">Unique to ${data.tokenizer1_name}</div>
+          </div>
+          <div class="diff-box">
+            <div class="diff-box-val">${data.exclusive_boundaries2.length}</div>
+            <div class="diff-box-lbl">Unique to ${data.tokenizer2_name}</div>
+          </div>
+        </div>
+      `;
+
+      // Token comparison lists
+      const t1Div = document.createElement("div");
+      t1Div.className = "dropout-sample-row";
+      t1Div.innerHTML = `<span class="dropout-sample-title">${data.tokenizer1_name} (${data.token_count1} tokens)</span>`;
+      const c1 = document.createElement("div");
+      c1.className = "token-container";
+      data.tokens1.forEach((t, i) => {
+        const chip = document.createElement("div");
+        chip.className = `token-chip ${COLOR_CLASSES[i % COLOR_CLASSES.length]}`;
+        chip.innerHTML = `<span>${escapeHtml(t)}</span>`;
+        c1.appendChild(chip);
+      });
+      t1Div.appendChild(c1);
+      container.appendChild(t1Div);
+
+      const t2Div = document.createElement("div");
+      t2Div.className = "dropout-sample-row";
+      t2Div.innerHTML = `<span class="dropout-sample-title">${data.tokenizer2_name} (${data.token_count2} tokens)</span>`;
+      const c2 = document.createElement("div");
+      c2.className = "token-container";
+      data.tokens2.forEach((t, i) => {
+        const chip = document.createElement("div");
+        chip.className = `token-chip ${COLOR_CLASSES[(i + 3) % COLOR_CLASSES.length]}`;
+        chip.innerHTML = `<span>${escapeHtml(t)}</span>`;
+        c2.appendChild(chip);
+      });
+      t2Div.appendChild(c2);
+      container.appendChild(t2Div);
+    } catch (e) {
+      container.innerHTML = `<div style="color:var(--accent-rose)">Diff request failed: ${e.message}</div>`;
+    }
+  });
+}
+
+// Batch Action
+const runBatchBtn = document.getElementById("runBatchBtn");
+if (runBatchBtn) {
+  runBatchBtn.addEventListener("click", async () => {
+    const raw = document.getElementById("batchInput").value;
+    const texts = raw.split("\n").map(s => s.trim()).filter(Boolean);
+    const maxLen = parseInt(document.getElementById("batchMaxLen").value, 10) || 12;
+    const container = document.getElementById("batchResults");
+    container.innerHTML = "<div>Processing batch & attention masks...</div>";
+
+    try {
+      const resp = await fetch("/api/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts, max_length: maxLen, padding: "longest" })
+      });
+      const data = await resp.json();
+      let html = `<div class="table-responsive"><table class="batch-matrix-table">`;
+      html += `<thead><tr><th>#</th><th>Input Text</th><th>Tokens Matrix</th><th>Attention Mask</th></tr></thead><tbody>`;
+
+      data.input_ids.forEach((ids, idx) => {
+        const strList = data.token_strings[idx].map(s => {
+          return s === "<pad>" ? `<span class="pad-cell">&lt;pad&gt;</span>` : `<span>[${escapeHtml(s)}]</span>`;
+        }).join(" ");
+        const maskStr = data.attention_mask[idx].join(", ");
+
+        html += `
+          <tr>
+            <td><strong>${idx + 1}</strong></td>
+            <td>"${escapeHtml(texts[idx] || '')}"</td>
+            <td>${strList}</td>
+            <td><code>[${maskStr}]</code></td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table></div>`;
+      container.innerHTML = html;
+    } catch (e) {
+      container.innerHTML = `<div style="color:var(--accent-rose)">Batch request failed: ${e.message}</div>`;
+    }
+  });
+}
+
 // Initial run
 window.addEventListener("DOMContentLoaded", () => {
   runComparison();

@@ -141,6 +141,101 @@ class TokenCraftHandler(http.server.SimpleHTTPRequestHandler):
             res = tok.encode(sentence)
             self._send_json(res.to_dict())
 
+        elif self.path == "/api/dropout":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            data = json.loads(body) if body else {}
+
+            sentence = data.get("sentence", "tokenization algorithms and subwords")
+            dropout_rate = float(data.get("dropout_rate", 0.2))
+            samples_n = int(data.get("samples", 4))
+            vocab_size = int(data.get("vocab_size", 400))
+
+            corpus = DEFAULT_CORPUS + [sentence]
+            bpe = BPETokenizer(name="BPE")
+            bpe.train(corpus, vocab_size=vocab_size)
+
+            deterministic = bpe.encode(sentence, dropout_rate=0.0).to_dict()
+            stochastic_samples = bpe.sample_segmentations(sentence, n=samples_n, dropout_rate=dropout_rate)
+
+            self._send_json({
+                "sentence": sentence,
+                "dropout_rate": dropout_rate,
+                "deterministic": deterministic,
+                "samples": stochastic_samples,
+            })
+
+        elif self.path == "/api/diff":
+            from tokencraft.diff import TokenizerDiffEngine
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            data = json.loads(body) if body else {}
+
+            sentence = data.get("sentence", "tokenization is the foundation of modern NLP")
+            tok1_type = data.get("tok1", "bpe").lower()
+            tok2_type = data.get("tok2", "wordpiece").lower()
+            vocab_size = int(data.get("vocab_size", 400))
+
+            corpus = DEFAULT_CORPUS + [sentence]
+
+            def get_tok(t_type: str):
+                if t_type == "bpe":
+                    t = BPETokenizer(name="BPE")
+                    t.train(corpus, vocab_size=vocab_size)
+                    return t
+                elif t_type in ("wordpiece", "wp"):
+                    t = WordPieceTokenizer(name="WordPiece")
+                    t.train(corpus, vocab_size=vocab_size)
+                    return t
+                elif t_type in ("unigram", "uni"):
+                    t = UnigramTokenizer(name="Unigram")
+                    t.train(corpus, vocab_size=vocab_size)
+                    return t
+                elif t_type in ("char", "character"):
+                    t = CharacterTokenizer(name="Character")
+                    t.train(corpus, vocab_size=150)
+                    return t
+                elif t_type == "byte":
+                    return ByteTokenizer(name="Byte")
+                else:
+                    t = WordTokenizer(name="Word")
+                    t.train(corpus, vocab_size=300)
+                    return t
+
+            t1 = get_tok(tok1_type)
+            t2 = get_tok(tok2_type)
+
+            diff_res = TokenizerDiffEngine.compare(t1, t2, sentence)
+            self._send_json(diff_res.to_dict())
+
+        elif self.path == "/api/batch":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            data = json.loads(body) if body else {}
+
+            texts = data.get("texts", ["Hello world", "TokenCraft batch encoder"])
+            max_length = data.get("max_length", None)
+            if max_length is not None:
+                max_length = int(max_length)
+            padding = data.get("padding", "longest")
+            tok_type = data.get("type", "bpe").lower()
+            vocab_size = int(data.get("vocab_size", 400))
+
+            corpus = DEFAULT_CORPUS + texts
+            if tok_type == "wordpiece":
+                tok = WordPieceTokenizer(name="WordPiece")
+            elif tok_type == "unigram":
+                tok = UnigramTokenizer(name="Unigram")
+            elif tok_type == "char":
+                tok = CharacterTokenizer(name="Char")
+            else:
+                tok = BPETokenizer(name="BPE")
+            tok.train(corpus, vocab_size=vocab_size)
+
+            batch_res = tok.encode_batch(texts, padding=padding, max_length=max_length)
+            self._send_json(batch_res.to_dict())
+
         else:
             self.send_error(404, "Endpoint not found")
 
